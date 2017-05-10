@@ -48,4 +48,15 @@ int main(int argc, char *argv[])
         fprintf(stderr, "accetp() Failed %d\n", remote_fd);
         exit(EXIT_FAILURE);
     }
+
+    printf("Client Connection ... my_fd(%d), remote_fd(%d) \n", sock_fd, remote_fd);
+
+    sleep(5);
+
+    printf("Close Server !\n");
+
+    close(sock_fd);
+
+    return 0;
+
 }

@@ -3,8 +3,9 @@
 #include<string.h>
 
 char help_message[] = 
-    "Usage : sftd\n"
-    "Socket File Transer Daemon\n";
+    "Usage : sftc [option]\n"
+    " -i : remote ip address , Ex : 192.168.1.1\n"
+    " -d : remote domain , Ex : www.google.com\n";
 
 void call_help(void) 
 {
