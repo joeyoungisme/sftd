@@ -1,20 +1,20 @@
 #ifndef PDU_H
 #define PDU_H
 
+#include "cmd.h"
+
 #define MAX_CMD_ARG_LEN     256
 
-typedef enum {
-    CMD_LS = 0,
-    CMD_GET,
-    CMD_PUT,
-
-    CMD_AMOUNT
-}CMD_LINE;
-
 typedef struct {
-    CMD_LINE cmd;
+    COMMAND cmd;
     char arg[MAX_CMD_ARG_LEN];
-}SFTD_PDU;
+}SFT_PDU;
+
+SFT_PDU *pdu_new(void);
+
+int pdu_set(SFT_PDU *pdu);
+
+void pdu_free(SFT_PDU *pdu);
 
 
 

@@ -1,14 +1,15 @@
 #include<unistd.h>
 #include<stdio.h>
 #include<stdlib.h>
+#include<string.h>
 #include<sys/socket.h>
 #include<sys/types.h>
 #include<errno.h>
 #include<netinet/in.h>
 
 
-#include "err.h"
 #include "pdu.h"
+#include "err.h"
 #include "sftd.h"
 
 int main(int argc, char *argv[])
@@ -49,12 +50,26 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    printf("Client Connection ... my_fd(%d), remote_fd(%d) \n", sock_fd, remote_fd);
+    SFT_PDU *pdu = pdu_new();
 
-    sleep(5);
+    struct iovec iov = {
+        .iov_base = (void *)pdu,
+        .iov_len = sizeof(SFT_PDU)
+    };
 
-    printf("Close Server !\n");
+    struct msghdr hdr;
+    memset(&hdr, 0, sizeof(struct msghdr));
 
+    hdr.msg_iov = &iov;
+    hdr.msg_iovlen = 1;
+    hdr.msg_control = NULL;
+    hdr.msg_controllen = 0;
+
+    printf("Recvice Res : %d\n", (int)recvmsg(remote_fd, &hdr, 0));
+
+    printf("cmd = %d, Argument = %s\n", (int)pdu->cmd, pdu->arg);
+
+    pdu_free(pdu);
     close(sock_fd);
 
     return 0;

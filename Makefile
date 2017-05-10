@@ -1,7 +1,9 @@
 CC=gcc
 CFLAGS=-g -Wall -O3
 LDLIBS=
-OBJECTS=err.o pdu.o
+OBJECTS=err.o pdu.o cmd.o
+
+all: server client
 
 server: $(OBJECTS) sftd.o
 	$(CC) $(LDLIBS) -o sftd $(OBJECTS) sftd.o
@@ -20,6 +22,9 @@ err.o: err.c
 
 pdu.o: pdu.c
 	$(CC) $(CFLAGS) -c pdu.c
+
+cmd.o: cmd.c
+	$(CC) $(CFLAGS) -c cmd.c
 
 clean:
 	rm *.o sftd sftc
