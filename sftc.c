@@ -12,79 +12,62 @@
 #include "pdu.h"
 #include "err.h"
 #include "sftc.h"
-#include "sftd.h"
 
-int main(int argc, char *argv[])
+struct __SFT_ACTION *sft_client_action(void)
 {
-    //Get IP or Domain
-    if(argc < 2) {
-        call_help();
-        exit(EXIT_FAILURE);
-    }
-
-    REMOTE_INFO remote = {
-        .sockfd = 0,
-        .ipaddr = "",
-        .domain = ""
+    static struct __SFT_ACTION sft_client = {
+        .init = sft_client_init,
+        .connect = sft_client_connect,
+        .send = sft_client_send,
+        .recv = sft_client_recv,
+        .info = sft_client_info,
+        .close = sft_client_close
     };
+   
+   return &sft_client;
+} 
 
-    int opt = 0;
-    while((opt = getopt(argc, argv, "i:d:")) != -1) {
-        switch(opt) {
-        case 'i':
-            snprintf(remote.ipaddr, 16, "%s", optarg);
-            break;
-        case 'd':
-            snprintf(remote.domain, 128, "%s", optarg);
-            break;
-        default:
-            call_help();
-            exit(EXIT_FAILURE);
-        }
-    }
+int sft_client_init(SFT_DATA *sft)
+{
+    sft->sockfd = 0;
 
-    //Connect to Server 
-    struct sockaddr_in remote_addr = {
+    sft->remotefd = 0;
+    sft->info = NULL;
+
+    return 0;
+}
+
+int sft_client_connect(SFT_DATA *sft, char *ipaddr, unsigned short port)
+{
+    const struct sockaddr_in remote_info = {
         .sin_family = AF_INET,
-        .sin_addr.s_addr = inet_addr(remote.ipaddr),
-        .sin_port = htons(SFTD_PORT)
+        .sin_addr.s_addr = inet_addr(ipaddr),
+        .sin_port = htons(port)
     };
+    
+    socklen_t socklen = sizeof(remote_info);
 
-    socklen_t socklen = sizeof(remote_addr);
-
-    int res = 0;
-
-    remote.sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    if(remote.sockfd < 0) {
-        fprintf(stderr, "socket() Failed %d\n", remote.sockfd);
-        exit(EXIT_FAILURE);
+    sft->sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if(sft->sockfd < 0) {
+        fprintf(stderr, "socket() Failed %d\n", sft->sockfd);
+        return -1;
     }
 
-    res = connect(remote.sockfd, (struct sockaddr *)&remote_addr, socklen);
-    if(res < 0) {
-        fprintf(stderr, "connect() Failed %d\n", res);
-        exit(EXIT_FAILURE);
+    if(connect(sft->sockfd, (struct sockaddr *)&remote_info, socklen) < 0) {
+        fprintf(stderr, "connect() Failed \n");
+        return -1;
     }
 
-    //PDU Create & Setting
-    SFT_PDU *pdu = pdu_new();
-    if(!pdu) {
-        fprintf(stderr, "pdu_create() Failed\n");
-        close(remote.sockfd);
-        exit(EXIT_FAILURE);
-    }
+    sft->info = &remote_info;
 
-    if(pdu_set(pdu) != 0) {
-        fprintf(stderr, "pdu_set() Failed\n");
-        close(remote.sockfd);
-        pdu_free(pdu);
-        exit(EXIT_FAILURE);
-    }
+    return 0;
+}
 
-    //Socket Build-in function "iovec" and "msghdr"
+int sft_client_send(SFT_DATA *sft, void *data, size_t length)
+{
     struct iovec iov = {
-        .iov_base = (void *)pdu,
-        .iov_len = sizeof(SFT_PDU)
+        .iov_base = data,
+        .iov_len = length
     };
 
     struct msghdr hdr;
@@ -95,11 +78,37 @@ int main(int argc, char *argv[])
     hdr.msg_control = NULL;
     hdr.msg_controllen = 0;
 
-    printf("Send Res : %d\n", (int)sendmsg(remote.sockfd, &hdr, 0));
+    return sendmsg(sft->sockfd, &hdr, 0);
+}
 
-    pdu_free(pdu);
-    close(remote.sockfd);
+int sft_client_recv(SFT_DATA *sft, void *data, size_t length)
+{
+    struct iovec iov = {
+        .iov_base = data,
+        .iov_len = length
+    };
+
+    struct msghdr hdr;
+    memset(&hdr, 0, sizeof(struct msghdr));
+
+    hdr.msg_iov = &iov;
+    hdr.msg_iovlen = 1;
+    hdr.msg_control = NULL;
+    hdr.msg_controllen = 0;
+
+    return recvmsg(sft->sockfd, &hdr, 0);
+}
+
+int sft_client_info(SFT_DATA *sft)
+{
+    printf("Show info !\n");
+    return 0;
+}
+
+int sft_client_close(SFT_DATA *sft)
+{
+    close(sft->sockfd);
 
     return 0;
-
 }
+

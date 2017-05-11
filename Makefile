@@ -1,21 +1,28 @@
 CC=gcc
 CFLAGS=-g -Wall -O3
 LDLIBS=
-OBJECTS=err.o pdu.o cmd.o
+OBJECTS=err.o pdu.o cmd.o sfts.o sftc.o sft.o
 
 all: server client
 
-server: $(OBJECTS) sftd.o
-	$(CC) $(LDLIBS) -o sftd $(OBJECTS) sftd.o
+server: $(OBJECTS)
+	$(CC) $(CFLAGS) -c sft_server.c
+	$(CC) $(LDLIBS) -o sft_server $(OBJECTS) sft_server.o
 
-client: $(OBJECTS) sftc.o
-	$(CC) $(LDLIBS) -o sftc $(OBJECTS) sftc.o
+client: $(OBJECTS) 
+	$(CC) $(CFLAGS) -c sft_client.c
+	$(CC) $(LDLIBS) -o sft_client $(OBJECTS) sft_client.o
+
+obj: $(OBJECTS) sft.o
+
+sft.o: sft.c
+	$(CC) $(CFLAGS) -c sft.c
 
 sftc.o: sftc.c
 	$(CC) $(CFLAGS) -c sftc.c
 
-sftd.o: sftd.c
-	$(CC) $(CFLAGS) -c sftd.c
+sftd.o: sfts.c
+	$(CC) $(CFLAGS) -c sfts.c
 
 err.o: err.c
 	$(CC) $(CFLAGS) -c err.c
