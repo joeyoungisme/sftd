@@ -3,11 +3,11 @@
 #include<string.h>
 
 char help_message[] = 
-    "Usage : sftc [option]\n"
-    " -i : remote ip address , Ex : 192.168.1.1\n"
-    " -d : remote domain , Ex : www.google.com\n";
+    "Usage : %s [option]\n"
+    " -i < ip address >             remote ip address , Ex : 192.168.1.1\n"
+    " -d < domain name >            remote domain , Ex : www.google.com\n";
 
-void call_help(void) 
+void call_help(char *name) 
 {
-    printf("%s", help_message);
+    printf(help_message, name);
 }

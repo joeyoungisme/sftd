@@ -1,6 +1,7 @@
 #include<unistd.h>
 #include<stdlib.h>
 #include<stdio.h>
+#include<string.h>
 
 #include "sft.h"
 #include "pdu.h"
@@ -25,28 +26,21 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    char message[] = "hello world i am server";
-    int length = sizeof(message);
+    char recv_cmd[256];
+    
+    do {
+        memset(recv_cmd, 0, 256);
 
-    printf("Server Send : %s\n", message);
+        if(server->action->recv(server, (void *)recv_cmd, 256) <= 0) {
+            fprintf(stderr, "server : receive command failed\n");
+            sft_destroy(server);
+            exit(EXIT_FAILURE);
+        }
 
-    if(server->action->send(server, (void *)message, length) <= 0) {
-        fprintf(stderr, "server : send failed \n");
-        sft_destroy(server);
-        exit(EXIT_FAILURE);
-    }
+        printf("Server Reveice Command : %s\n", recv_cmd);
 
-    sleep(2);
 
-    if(server->action->recv(server, (void *)message, length) <= 0) {
-        fprintf(stderr, "server : recv failed\n");
-        sft_destroy(server);
-        exit(EXIT_FAILURE);
-    }
-
-    printf("Server Recv : %s\n", message);
-
-    sleep(10);
+    }while(strncmp(recv_cmd, "quit", 4) != 0);
 
     sft_destroy(server);
 

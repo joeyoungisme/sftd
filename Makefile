@@ -34,4 +34,4 @@ cmd.o: cmd.c
 	$(CC) $(CFLAGS) -c cmd.c
 
 clean:
-	rm *.o sftd sftc
+	rm *.o sft_server sft_client

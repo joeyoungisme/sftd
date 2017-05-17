@@ -1,13 +1,18 @@
 #include<unistd.h>
 #include<stdlib.h>
 #include<stdio.h>
+#include<string.h>
 
 #include "sft.h"
 #include "pdu.h"
+#include "err.h"
 
 int main(int argc, char *argv[])
 {
-    printf("i am client !\n");
+    if(argc < 2) {
+        call_help(argv[0]);
+        exit(EXIT_FAILURE);
+    }
 
     SFT_DATA *client = sft_create(SFT_CLIENT);
     if(client == NULL) {
@@ -25,29 +30,25 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    char message[] = "i am client hello world";
-    int length = sizeof(message);
+    char command[256];
+    do {
+        printf("Command >> ");
+        if(!(fgets(command, 256, stdin))) {
+            fprintf(stderr, "get command failed!\n");
+            sft_destroy(client);
+            exit(EXIT_FAILURE);
+        }
 
-    sleep(1);
+        if(!strchr(command, '\n'))
+            while(fgetc(stdin) != '\n');
 
-    if(client->action->recv(client, (void *)message, length) <= 0) {
-        fprintf(stderr, "client : recv failed\n");
-        sft_destroy(client);
-        exit(EXIT_FAILURE);
-    }
+        if(client->action->send(client, (void *)command, strlen(command)) <= 0) {
+            fprintf(stderr, "client send command failed\n");
+            sft_destroy(client);
+            exit(EXIT_FAILURE);
+        }
 
-    printf("Client Recv : %s\n", message);
-
-    snprintf(message, length, "%s", "i am client hello world");
-    printf("Client Send : %s\n", message);
-
-    if(client->action->send(client, (void *)message, length) <= 0) {
-        fprintf(stderr, "client : send failed\n");
-        sft_destroy(client);
-        exit(EXIT_FAILURE);
-    }
-
-    sleep(10);
+    }while(strncmp(command, "quit", 4) != 0);
 
     sft_destroy(client);
 

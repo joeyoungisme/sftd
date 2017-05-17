@@ -2,7 +2,7 @@
 #define ERR_H
 
 
-void call_help(void);
+void call_help(char *name);
 
 
 
