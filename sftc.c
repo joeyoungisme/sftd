@@ -23,9 +23,9 @@ struct __SFT_ACTION *sft_client_action(void)
         .info = sft_client_info,
         .close = sft_client_close
     };
-   
+
    return &sft_client;
-} 
+}
 
 int sft_client_init(SFT_DATA *sft)
 {
@@ -44,7 +44,7 @@ int sft_client_connect(SFT_DATA *sft, char *ipaddr, unsigned short port)
         .sin_addr.s_addr = inet_addr(ipaddr),
         .sin_port = htons(port)
     };
-    
+
     socklen_t socklen = sizeof(remote_info);
 
     sft->sockfd = socket(AF_INET, SOCK_STREAM, 0);

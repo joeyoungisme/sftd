@@ -28,6 +28,7 @@ struct __SFT_ACTION *sft_server_action(void)
 
 int sft_server_init(SFT_DATA *sft)
 {
+    sft->type = SFT_SERVER;
     sft->sockfd = 0;
 
     sft->remotefd = 0;
@@ -52,7 +53,7 @@ int sft_server_connect(SFT_DATA *sft, char *ipaddr, unsigned short port)
         fprintf(stderr, "socket() Failed %d\n", sft->sockfd);
         return -1;
     }
-    
+
 
     if(bind(sft->sockfd, (struct sockaddr *)&srv_addr, socklen) != 0) {
         fprintf(stderr, "bind() Failed\n");
@@ -115,15 +116,17 @@ int sft_server_recv(SFT_DATA *sft, void *data, size_t length)
 int sft_server_info(SFT_DATA *sft)
 {
     printf("Show Info !!\n");
-    
+
     return 0;
 }
 
 int sft_server_close(SFT_DATA *sft)
 {
+    if(!sft) return 0;
+    close(sft->remotefd);
     close(sft->sockfd);
     free(sft->info);
-    
+
     return 0;
 }
 

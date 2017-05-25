@@ -3,12 +3,16 @@
 
 #include<sys/socket.h>
 
+#define MAX_TRANSFER_LENGTH         4096
+#define SFT_PORT                    9420
+
 typedef enum {
     SFT_SERVER = 0,
     SFT_CLIENT
 }SFT_TYPE;
 
 typedef struct __SFT_DATA {
+    SFT_TYPE type;
     int sockfd;
 
     int remotefd;

@@ -27,7 +27,7 @@ int main(int argc, char *argv[])
     }
 
     char recv_cmd[256];
-    
+
     do {
         memset(recv_cmd, 0, 256);
 
@@ -39,6 +39,18 @@ int main(int argc, char *argv[])
 
         printf("Server Reveice Command : %s\n", recv_cmd);
 
+
+        if(strncmp(recv_cmd, "ls", 2) == 0 || strncmp(recv_cmd, "LS", 2) == 0) {
+            //Call ls function
+        }
+
+        if(strncmp(recv_cmd, "get", 3) == 0 || strncmp(recv_cmd, "GET", 3) == 0) {
+            //Call get function
+        }
+
+        if(strncmp(recv_cmd, "put", 3) == 0 || strncmp(recv_cmd, "PUT", 3) == 0) {
+            //Call put function
+        }
 
     }while(strncmp(recv_cmd, "quit", 4) != 0);
 

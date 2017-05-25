@@ -1,7 +1,7 @@
 CC=gcc
-CFLAGS=-g -Wall -O3
-LDLIBS=
-OBJECTS=err.o pdu.o cmd.o sfts.o sftc.o sft.o
+CFLAGS=-g -Wall -O3 -D_REENTRANT
+LDLIBS=-lpthread
+OBJECTS=err.o pdu.o util.o sfts.o sftc.o sft.o
 
 all: server client
 
@@ -9,7 +9,7 @@ server: $(OBJECTS)
 	$(CC) $(CFLAGS) -c sft_server.c
 	$(CC) $(LDLIBS) -o sft_server $(OBJECTS) sft_server.o
 
-client: $(OBJECTS) 
+client: $(OBJECTS)
 	$(CC) $(CFLAGS) -c sft_client.c
 	$(CC) $(LDLIBS) -o sft_client $(OBJECTS) sft_client.o
 
@@ -30,8 +30,12 @@ err.o: err.c
 pdu.o: pdu.c
 	$(CC) $(CFLAGS) -c pdu.c
 
-cmd.o: cmd.c
-	$(CC) $(CFLAGS) -c cmd.c
+util.o: util.c
+	$(CC) $(CFLAGS) -c util.c
+
+tester: tester.c $(OBJECTS)
+	$(CC) $(CFLAGS) -c tester.c
+	$(CC) $(LDLIBS) -o tester $(OBJECTS) tester.o
 
 clean:
-	rm *.o sft_server sft_client
+	rm *.o sft_server sft_client tester
