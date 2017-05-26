@@ -58,7 +58,7 @@ int pdu_info(SFT_PDU *pdu)
     return 0;
 }
 
-    
+
 
 int pdu_init(SFT_PDU *pdu)
 {

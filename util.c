@@ -96,9 +96,9 @@ int util_connection(struct __UTILITY_DATA *util)
         return -1;
     }
 
-    //SFT Initial Setting... util->sft 
+    //SFT Initial Setting... util->sft
     util->sft = sft_create(SFT_CLIENT);
-    if(!util->sft) 
+    if(!util->sft)
         return -1;
 
     int res = 0;
@@ -178,7 +178,7 @@ int util_put(struct __UTILITY_DATA *util)
     }
 
     util->sft->action->send(util->sft, (void *)util->pdu, sizeof(SFT_PDU));
-    
+
     return 0;
 }
 
@@ -236,7 +236,7 @@ int util_info(struct __UTILITY_DATA *util)
 
     if(util->sft)
         util->sft->action->info(util->sft);
-    
+
     printf(" -------------------------------- \n");
 
     return 0;
@@ -244,7 +244,7 @@ int util_info(struct __UTILITY_DATA *util)
 
 int util_help(void)
 {
-    char help_message[] = 
+    char help_message[] =
         "Following Command, Please Listen/Connection First\n"
         "listen             : Socket bind & accept\n"
         "connection [IP]    : Socket connect\n"

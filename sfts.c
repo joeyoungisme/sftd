@@ -115,12 +115,12 @@ int sft_server_recv(SFT_DATA *sft, void *data, size_t length)
 
 int sft_server_info(SFT_DATA *sft)
 {
-    if(!sft) 
+    if(!sft)
         return -1;
 
     printf("SFT : \n");
 
-    if(sft->type == SFT_CLIENT) 
+    if(sft->type == SFT_CLIENT)
         printf("\tType : Client\n");
     else
         printf("\tType : Server\n");

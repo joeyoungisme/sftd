@@ -5,11 +5,11 @@
 
 #include "util.h"
 
-int main(int argc, char *argv[]) 
+int main(int argc, char *argv[])
 {
 
     struct __UTILITY_DATA *util = util_create();
-    
+
     if(!util) {
         fprintf(stderr, "util create failed !\n");
         exit(EXIT_FAILURE);
