@@ -15,6 +15,7 @@ typedef enum {
     CMD_PUT,
     CMD_CLOSE,
     CMD_QUIT,
+    CMD_INFO,
     CMD_HELP,
 
     CMD_UNKNOWN
@@ -26,6 +27,8 @@ typedef struct __SFT_PDU {
 }SFT_PDU;
 
 SFT_PDU *pdu_new(void);
+
+int pdu_info(SFT_PDU *pdu);
 
 int pdu_init(SFT_PDU *pdu);
 

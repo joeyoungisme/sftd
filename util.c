@@ -9,6 +9,8 @@ void *thread_recv(void *arg)
 {
     struct __UTILITY_DATA *util = (struct __UTILITY_DATA *)arg;
 
+    util->recv->flag = THREAD_ALIVE;
+
     //select ...
     while(1) {
         pdu_init(util->pdu);
@@ -34,13 +36,17 @@ void *thread_recv(void *arg)
 
         sleep(1);
     }
+
+    printf("thread recv close!!\n");
 }
 
 void *thread_ls(void *arg)
 {
     struct __UTILITY_DATA *util = (struct __UTILITY_DATA *)arg;
+    printf("\n ------------------------------ \n");
     printf("Receiver : Recv Command \"ls\" \n");
-    printf("pdu arg : %s\n", util->pdu->arg);
+    printf("pdu arg : %s", util->pdu->arg);
+    printf("\n ------------------------------ \n");
 
     return NULL;
 }
@@ -48,27 +54,37 @@ void *thread_ls(void *arg)
 void *thread_get(void *arg)
 {
     struct __UTILITY_DATA *util = (struct __UTILITY_DATA *)arg;
+    printf("\n ------------------------------ \n");
     printf("REceiver : Recv Command \"get\" \n");
-    printf("pdu arg : %s\n", util->pdu->arg);
+    printf("pdu arg : %s", util->pdu->arg);
+    printf("\n ------------------------------ \n");
     return NULL;
 }
 
 void *thread_put(void *arg)
 {
     struct __UTILITY_DATA *util = (struct __UTILITY_DATA *)arg;
+    printf("\n ------------------------------ \n");
     printf("REceiver : Recv Command \"put\" \n");
-    printf("pdu arg : %s\n", util->pdu->arg);
+    printf("pdu arg : %s", util->pdu->arg);
+    printf("\n ------------------------------ \n");
     return NULL;
 }
 
 void *thread_close(void *arg)
 {
     struct __UTILITY_DATA *util = (struct __UTILITY_DATA *)arg;
+    printf("\n ------------------------------ \n");
     printf("REceiver : Recv Command \"close\" \n");
-    printf("pdu arg : %s\n", util->pdu->arg);
+    printf("pdu arg : %s", util->pdu->arg);
+    printf("\n ------------------------------ \n");
+
+    util->sft->action->send(util->sft, (void *)util->pdu, sizeof(SFT_PDU));
 
     sft_destroy(util->sft);
     util->sft = NULL;
+
+    util->recv->flag = THREAD_DEAD;
 
     pthread_exit(NULL);
     return NULL;
@@ -149,12 +165,7 @@ int util_close(struct __UTILITY_DATA *util)
 
     util->sft->action->send(util->sft, (void *)util->pdu, sizeof(SFT_PDU));
 
-    int res = pthread_cancel(util->recv->thd);
-    if(res) fprintf(stderr, "pthread_cancel failed!\n");
-
-    sft_destroy(util->sft);
-
-    util->sft = NULL;
+    pthread_join(util->recv->thd, NULL);
 
     return 0;
 }
@@ -197,15 +208,36 @@ int util_ls(struct __UTILITY_DATA *util)
 
 int util_quit(struct __UTILITY_DATA *util)
 {
+
+    if(util->sft) {
+        util->pdu->cmd = CMD_CLOSE;
+        util->action->close(util);
+    }
+
     if(util->pdu) {
         pdu_free(util->pdu);
         util->pdu = NULL;
     }
 
-    if(util->sft) {
-        sft_destroy(util->sft);
-        util->sft = NULL;
-    }
+    return 0;
+}
+
+int util_info(struct __UTILITY_DATA *util)
+{
+    printf("\n -------------------------------- \n");
+    pdu_info(util->pdu);
+
+    printf("THD : \n");
+
+    if(util->recv->flag == THREAD_ALIVE)
+        printf("\tThread Runing...\n");
+    else
+        printf("\tHave not create thread ... \n");
+
+    if(util->sft)
+        util->sft->action->info(util->sft);
+    
+    printf(" -------------------------------- \n");
 
     return 0;
 }
@@ -220,7 +252,9 @@ int util_help(void)
         "get [Path]         : Get remote side file\n"
         "put [Path]         : Put file to remote side\n"
         "close              : Close Coneection, Used listen / connection after close\n"
-        "quit               : Quit this Program\n";
+        "quit               : Quit this Program\n"
+        "help               : Show command list\n"
+        "info               : Show Something Information\n";
 
     printf("\n%s\n", help_message);
 
@@ -234,6 +268,7 @@ int util_init(struct __UTILITY_DATA *util)
     memset(util->pdu->arg, 0, MAX_CMD_ARG_LEN);
 
     //recv init
+    util->recv->flag = THREAD_DEAD;
     util->recv->thd = 0;
 
     //sft = null
@@ -265,6 +300,7 @@ struct __UTILITY_DATA *util_create(void)
         .get = util_get,
         .put = util_put,
         .quit = util_quit,
+        .info = util_info,
         .close = util_close,
         .help = util_help
     };
@@ -292,7 +328,8 @@ int util_run(struct __UTILITY_DATA *util)
         pdu_init(util->pdu);
 
         //set pdu cmd
-        pdu_setcommand(util->pdu);
+        if(pdu_setcommand(util->pdu))
+            continue;
 
         //execute / send cmd
         switch(util->pdu->cmd) {
@@ -317,6 +354,9 @@ int util_run(struct __UTILITY_DATA *util)
         case CMD_QUIT:
             util->action->quit(util);
             q_flag = 0;
+            break;
+        case CMD_INFO:
+            util->action->info(util);
             break;
         case CMD_HELP:
         default:

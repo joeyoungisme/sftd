@@ -8,7 +8,13 @@
 #define MAX_CMD_LEN             256
 #define MAX_CMD_ARG_LEN         256
 
+typedef enum {
+    THREAD_ALIVE,
+    THREAD_DEAD
+}THREAD_FLAG;
+
 struct __RECV_THREAD {
+    THREAD_FLAG flag;
     pthread_t thd;
 
     void *(*run)(void *arg);
@@ -35,6 +41,7 @@ struct __UTILITY_ACTION {
     int (*put)(struct __UTILITY_DATA *util);
     int (*close)(struct __UTILITY_DATA *util);
     int (*quit)(struct __UTILITY_DATA *util);
+    int (*info)(struct __UTILITY_DATA *util);
     int (*help)(void);
 };
 
@@ -51,6 +58,7 @@ int util_put(struct __UTILITY_DATA *util);
 int util_get(struct __UTILITY_DATA *util);
 int util_quit(struct __UTILITY_DATA *util);
 int util_ls(struct __UTILITY_DATA *util);
+int util_info(struct __UTILITY_DATA *util);
 int util_help(void);
 
 void *util_receiver(void *arg);

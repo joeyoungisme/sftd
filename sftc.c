@@ -29,6 +29,7 @@ struct __SFT_ACTION *sft_client_action(void)
 
 int sft_client_init(SFT_DATA *sft)
 {
+    sft->type = SFT_CLIENT;
     sft->sockfd = 0;
 
     sft->remotefd = 0;
@@ -101,7 +102,21 @@ int sft_client_recv(SFT_DATA *sft, void *data, size_t length)
 
 int sft_client_info(SFT_DATA *sft)
 {
-    printf("Show info !\n");
+    if(!sft) 
+        return -1;
+
+    printf("SFT : \n");
+
+    if(sft->type == SFT_CLIENT) 
+        printf("\tType : Client\n");
+    else
+        printf("\tType : Server\n");
+
+    printf("\tSocket fd : %d\n", sft->sockfd);
+
+    if(sft->type == SFT_SERVER)
+        printf("\tRemote fd : %d\n", sft->remotefd);
+
     return 0;
 }
 
