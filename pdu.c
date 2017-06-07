@@ -64,6 +64,7 @@ int pdu_init(SFT_PDU *pdu)
 {
     pdu->cmd = CMD_UNKNOWN;
     memset(pdu->arg, 0, MAX_CMD_ARG_LEN);
+    pdu->pdulen = sizeof(struct __SFT_PDU);
 
     return 0;
 }

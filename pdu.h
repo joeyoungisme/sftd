@@ -24,6 +24,7 @@ typedef enum {
 typedef struct __SFT_PDU {
     COMMAND cmd;
     char arg[MAX_CMD_ARG_LEN];
+    unsigned int pdulen;
 }SFT_PDU;
 
 SFT_PDU *pdu_new(void);

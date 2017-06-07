@@ -7,6 +7,7 @@
 
 #define MAX_CMD_LEN             256
 #define MAX_CMD_ARG_LEN         256
+#define MAX_PATH_LEN            256
 
 typedef enum {
     THREAD_ALIVE,

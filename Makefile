@@ -1,9 +1,12 @@
 CC=gcc
-CFLAGS=-g -Wall -O3 -D_REENTRANT
+CFLAGS=-g -Wall -O3 -D_REENTRANT -I ./libjoe
 LDLIBS=-lpthread
-OBJECTS=err.o pdu.o util.o sfts.o sftc.o sft.o
+OBJECTS=err.o pdu.o util.o sfts.o sftc.o sft.o ./libjoe/*.o
 
-all: server client
+all: libjoe server client tester
+
+libjoe:
+	make -C libjoe
 
 server: $(OBJECTS)
 	$(CC) $(CFLAGS) -c sft_server.c

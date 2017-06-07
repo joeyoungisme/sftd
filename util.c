@@ -2,8 +2,45 @@
 #include<stdio.h>
 #include<stdlib.h>
 #include<string.h>
+#include<dirent.h>
+#include<sys/time.h>
 
 #include "util.h"
+#include "heapsort.h"
+
+static char curr_addr[MAX_PATH_LEN] = "./";
+pthread_mutex_t sft_lock;
+
+int str_cmp(const void *arg1, const void *arg2)
+{
+    char *s1 = (char *)arg1;
+    char *s2 = (char *)arg2;
+
+    if(s1[0] == s2[0]) {
+        int len1 = strlen(s1);
+        int len2 = strlen(s2);
+        if(len1 == len2)
+            return 0;
+        if(len1 > len2)
+            return 1;
+        if(len1 < len2)
+            return -1;
+    }
+    if(s1[0] > s2[0])
+        return 1;
+    if(s1[0] < s2[0])
+        return -1;
+
+    return 0;
+}
+
+void str_swap(void *arg1, void *arg2, int size)
+{
+    char temp[size];
+    strncpy(temp, (char *)arg1, size);
+    strncpy((char *)arg1, (char *)arg2, size);
+    strncpy((char *)arg2, temp, size);
+}
 
 void *thread_recv(void *arg)
 {
@@ -11,8 +48,38 @@ void *thread_recv(void *arg)
 
     util->recv->flag = THREAD_ALIVE;
 
+    int recvfd = 0;
+    if(util->sft->type == SFT_SERVER)
+        recvfd = util->sft->remotefd;
+    else
+        recvfd = util->sft->sockfd;
+
+    fd_set recvset;
+    FD_ZERO(&recvset);
+
     //select ...
     while(1) {
+
+        pthread_mutex_lock(&sft_lock);
+
+        FD_SET(recvfd, &recvset);
+
+        struct timeval timeout = {
+            .tv_sec = 0,
+            .tv_usec = 0
+        };
+
+        if(select(recvfd + 1, &recvset, NULL, NULL, &timeout) == -1) {
+            fprintf(stderr, "Select Function Failure!\n");
+            pthread_exit(NULL);
+        }
+
+        if(FD_ISSET(recvfd, &recvset) == 0) {
+            pthread_mutex_unlock(&sft_lock);
+            sleep(1);
+            continue;
+        }
+
         pdu_init(util->pdu);
 
         util->sft->action->recv(util->sft, util->pdu, sizeof(SFT_PDU));
@@ -34,7 +101,7 @@ void *thread_recv(void *arg)
             break;
         }
 
-        sleep(1);
+        pthread_mutex_unlock(&sft_lock);
     }
 
     printf("thread recv close!!\n");
@@ -43,10 +110,41 @@ void *thread_recv(void *arg)
 void *thread_ls(void *arg)
 {
     struct __UTILITY_DATA *util = (struct __UTILITY_DATA *)arg;
-    printf("\n ------------------------------ \n");
-    printf("Receiver : Recv Command \"ls\" \n");
-    printf("pdu arg : %s", util->pdu->arg);
-    printf("\n ------------------------------ \n");
+    //printf("\n ------------------------------ \n");
+    //printf("Receiver : Recv Command \"ls %s\" \n", (char *)util->pdu->arg);
+
+    struct dirent **ls_dir;
+
+    int count = scandir((char*)util->pdu->arg, &ls_dir, NULL, NULL);
+    if(count < 0) {
+        pdu_init(util->pdu);
+        util->sft->action->send(util->sft, (void *)util->pdu, util->pdu->pdulen);
+        fprintf(stderr, "Scandir Failure!\n");
+        return NULL;
+    }
+
+    char copy_list[count][NAME_MAX];
+    memset(copy_list, 0, count * NAME_MAX);
+
+    for(int index = 0; index < count; ++index) {
+        strncpy(copy_list[index], ls_dir[index]->d_name, NAME_MAX);
+        free(ls_dir[index]);
+    }
+    free(ls_dir);
+
+    heapify((void*)copy_list, count, NAME_MAX, str_cmp, str_swap);
+
+    heapsorting((void*)copy_list, count, NAME_MAX, str_cmp, str_swap);   
+
+    for(int index = 0; index < count; ++index) {
+        strncpy((char *)util->pdu->arg, copy_list[index], MAX_CMD_ARG_LEN);
+        util->sft->action->send(util->sft, (void *)util->pdu, util->pdu->pdulen);
+    }
+    
+    pdu_init(util->pdu);
+    util->sft->action->send(util->sft, (void *)util->pdu, util->pdu->pdulen);
+    
+    //printf("\n ------------------------------ \n");
 
     return NULL;
 }
@@ -196,12 +294,37 @@ int util_get(struct __UTILITY_DATA *util)
 
 int util_ls(struct __UTILITY_DATA *util)
 {
+   
     if(!util->sft) {
         printf("Ls Error : Please Listen / Connection First\n");
         return -1;
     }
 
-    util->sft->action->send(util->sft, (void *)util->pdu, sizeof(SFT_PDU));
+    if(strncmp((char*)util->pdu->arg, "/", 1) == 0)
+        strncpy(curr_addr, (char *)util->pdu->arg, MAX_PATH_LEN);
+    else {
+        char temp[MAX_PATH_LEN];
+
+        if(strncmp((char *)util->pdu->arg, "./", 2) == 0)
+            snprintf(temp, MAX_PATH_LEN, "%s/%s", curr_addr, (char *)util->pdu->arg+2);
+        else
+            snprintf(temp, MAX_PATH_LEN, "%s/%s", curr_addr, (char *)util->pdu->arg);
+        strncpy(curr_addr, temp, MAX_PATH_LEN);
+        strncpy((char *)util->pdu->arg, temp, MAX_CMD_ARG_LEN);
+    }
+
+    pthread_mutex_lock(&sft_lock);
+
+    util->sft->action->send(util->sft, (void *)util->pdu, util->pdu->pdulen);
+
+    do {
+        util->sft->action->recv(util->sft, (void *)util->pdu, util->pdu->pdulen);
+
+        printf("%s\n", (char *)util->pdu->arg);
+
+    }while(util->pdu->cmd == CMD_LS);
+
+    pthread_mutex_unlock(&sft_lock);
 
     return 0;
 }
@@ -263,6 +386,10 @@ int util_help(void)
 
 int util_init(struct __UTILITY_DATA *util)
 {
+
+    //mutex init
+    pthread_mutex_init(&sft_lock, NULL);
+
     //pdu init
     util->pdu->cmd = CMD_UNKNOWN;
     memset(util->pdu->arg, 0, MAX_CMD_ARG_LEN);
@@ -370,6 +497,7 @@ int util_run(struct __UTILITY_DATA *util)
 
 void util_destroy(struct __UTILITY_DATA *util)
 {
+    pthread_mutex_destroy(&sft_lock);
 
     if(util->action)
         util->action->quit(util);
