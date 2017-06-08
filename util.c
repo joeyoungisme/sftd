@@ -16,6 +16,16 @@ int str_cmp(const void *arg1, const void *arg2)
     char *s1 = (char *)arg1;
     char *s2 = (char *)arg2;
 
+    if(strchr(s1, '/')) {
+        if(strchr(s2, '/'));
+        else
+            return -1;
+    }
+    else 
+        if(strchr(s2, '/'))
+            return 1;
+
+
     if(s1[0] == s2[0]) {
         int len1 = strlen(s1);
         int len2 = strlen(s2);
@@ -58,7 +68,7 @@ void *thread_recv(void *arg)
     FD_ZERO(&recvset);
 
     //select ...
-    while(1) {
+    while(util->recv->flag) {
 
         pthread_mutex_lock(&sft_lock);
 
@@ -104,20 +114,20 @@ void *thread_recv(void *arg)
         pthread_mutex_unlock(&sft_lock);
     }
 
-    printf("thread recv close!!\n");
+    pthread_exit(NULL);
 }
 
 void *thread_ls(void *arg)
 {
     struct __UTILITY_DATA *util = (struct __UTILITY_DATA *)arg;
-    //printf("\n ------------------------------ \n");
-    //printf("Receiver : Recv Command \"ls %s\" \n", (char *)util->pdu->arg);
 
     struct dirent **ls_dir;
 
     int count = scandir((char*)util->pdu->arg, &ls_dir, NULL, NULL);
     if(count < 0) {
         pdu_init(util->pdu);
+        util->pdu->cmd = CMD_ERROR;
+        snprintf(util->pdu->arg, MAX_CMD_ARG_LEN, "Scandir Failure %d", count);
         util->sft->action->send(util->sft, (void *)util->pdu, util->pdu->pdulen);
         fprintf(stderr, "Scandir Failure!\n");
         return NULL;
@@ -128,9 +138,17 @@ void *thread_ls(void *arg)
 
     for(int index = 0; index < count; ++index) {
         strncpy(copy_list[index], ls_dir[index]->d_name, NAME_MAX);
+        if(ls_dir[index]->d_type == DT_DIR) {
+            printf("DIR : %s", ls_dir[index]->d_name);
+            strncpy(strchr(copy_list[index], '\0'), "/\0", NAME_MAX);
+            printf(", %s\n", copy_list[index]);
+        }
         free(ls_dir[index]);
     }
     free(ls_dir);
+
+    for(int index = 0; index < count; ++index)
+        printf("copy list [%d] = %s\n", index, copy_list[index]);
 
     heapify((void*)copy_list, count, NAME_MAX, str_cmp, str_swap);
 
@@ -144,28 +162,54 @@ void *thread_ls(void *arg)
     pdu_init(util->pdu);
     util->sft->action->send(util->sft, (void *)util->pdu, util->pdu->pdulen);
     
-    //printf("\n ------------------------------ \n");
-
     return NULL;
 }
 
 void *thread_get(void *arg)
 {
     struct __UTILITY_DATA *util = (struct __UTILITY_DATA *)arg;
-    printf("\n ------------------------------ \n");
-    printf("REceiver : Recv Command \"get\" \n");
-    printf("pdu arg : %s", util->pdu->arg);
-    printf("\n ------------------------------ \n");
+
+    FILE *readfd = fopen((char *)util->pdu->arg, "r");
+    if(readfd == NULL) {
+        pdu_error(util->pdu, "remote open file error");
+        perror("fopen");
+        util->sft->action->send(util->sft, (void *)util->pdu, util->pdu->pdulen);
+        return NULL;
+    }
+
+    while(fgets((char *)util->pdu->arg, MAX_CMD_ARG_LEN, readfd) != NULL) 
+        util->sft->action->send(util->sft, (void *)util->pdu, util->pdu->pdulen);
+
+    pdu_init(util->pdu);
+    util->sft->action->send(util->sft, (void *)util->pdu, util->pdu->pdulen);
+
+    fclose(readfd);
+
     return NULL;
 }
 
 void *thread_put(void *arg)
 {
     struct __UTILITY_DATA *util = (struct __UTILITY_DATA *)arg;
-    printf("\n ------------------------------ \n");
-    printf("REceiver : Recv Command \"put\" \n");
-    printf("pdu arg : %s", util->pdu->arg);
-    printf("\n ------------------------------ \n");
+
+    FILE *writefd = fopen((char *)util->pdu->arg, "w+");
+    if(writefd == NULL) {
+        pdu_error(util->pdu, "remote open file error");
+        perror("fopen");
+        util->sft->action->send(util->sft, (void *)util->pdu, util->pdu->pdulen);
+        return NULL;
+    }
+    
+    while(1) {
+        util->sft->action->recv(util->sft, (void *)util->pdu, util->pdu->pdulen);
+        if(util->pdu->cmd != CMD_PUT)
+            break;
+
+        fputs((char *)util->pdu->arg, writefd);
+    }
+
+    fclose(writefd);
+    
     return NULL;
 }
 
@@ -174,7 +218,6 @@ void *thread_close(void *arg)
     struct __UTILITY_DATA *util = (struct __UTILITY_DATA *)arg;
     printf("\n ------------------------------ \n");
     printf("REceiver : Recv Command \"close\" \n");
-    printf("pdu arg : %s", util->pdu->arg);
     printf("\n ------------------------------ \n");
 
     util->sft->action->send(util->sft, (void *)util->pdu, sizeof(SFT_PDU));
@@ -184,7 +227,6 @@ void *thread_close(void *arg)
 
     util->recv->flag = THREAD_DEAD;
 
-    pthread_exit(NULL);
     return NULL;
 }
 
@@ -229,23 +271,27 @@ int util_listen(struct __UTILITY_DATA *util)
 
     util->sft = sft_create(SFT_SERVER);
     if(!util->sft) {
+        fprintf(stderr, "SFT Create Failure\n");
         return -1;
     }
 
     int res = util->sft->action->init(util->sft);
     if(res) {
+        fprintf(stderr, "sft init failure\n");
         sft_destroy(util->sft);
         return res;
     }
 
     res = util->sft->action->connect(util->sft, NULL, SFT_PORT);
     if(res) {
+        fprintf(stderr, "sft connection failure\n");
         sft_destroy(util->sft);
         return res;
     }
 
     res = pthread_create(&util->recv->thd, NULL, util->recv->run, (void *)util);
     if(res != 0) {
+        perror("pthread create");
         sft_destroy(util->sft);
         return res;
     }
@@ -275,7 +321,40 @@ int util_put(struct __UTILITY_DATA *util)
         return -1;
     }
 
+    //open file
+    FILE *readfd = fopen((char *)util->pdu->arg, "r");
+    if(readfd == NULL) {
+        perror("fopen");
+        return -1;
+    }
+
+    //Generator remote addr
+    char temp[MAX_PATH_LEN];
+    snprintf(temp, MAX_PATH_LEN, "%s/%s", curr_addr, (char *)util->pdu->arg);
+    strncpy((char *)util->pdu->arg, temp, MAX_CMD_ARG_LEN);
+
+    //Lock -> send command & transfer file -> Unlock
+    pthread_mutex_lock(&sft_lock);
+    
     util->sft->action->send(util->sft, (void *)util->pdu, sizeof(SFT_PDU));
+    while(fgets((char *)util->pdu->arg, MAX_CMD_ARG_LEN, readfd))
+        util->sft->action->send(util->sft, (void *)util->pdu, sizeof(SFT_PDU));
+
+    pdu_init(util->pdu);
+    util->sft->action->send(util->sft, (void *)util->pdu, sizeof(SFT_PDU));
+
+    pthread_mutex_unlock(&sft_lock);
+
+    //Close file
+    fclose(readfd);
+
+    //Finish ! if Error print else writen curraddr
+    if(util->pdu->cmd == CMD_ERROR)
+        printf("put : %s\n", (char *)util->pdu->arg);
+    else {
+        *(strrchr(temp, '/')) = '\0';
+        strncpy(curr_addr, temp, MAX_PATH_LEN);
+    }
 
     return 0;
 }
@@ -287,7 +366,52 @@ int util_get(struct __UTILITY_DATA *util)
         return -1;
     }
 
-    util->sft->action->send(util->sft, (void *)util->pdu, sizeof(SFT_PDU));
+    //Check user enter address
+    char temp[MAX_PATH_LEN];
+    if(strncmp((char*)util->pdu->arg, "/", 1) == 0)
+        strncpy(temp, (char *)util->pdu->arg, MAX_PATH_LEN);
+    else {
+        if(strncmp((char *)util->pdu->arg, "./", 2) == 0)
+            snprintf(temp, MAX_PATH_LEN, "%s/%s", curr_addr, (char *)util->pdu->arg+2);
+        else
+            snprintf(temp, MAX_PATH_LEN, "%s/%s", curr_addr, (char *)util->pdu->arg);
+        strncpy((char *)util->pdu->arg, temp, MAX_CMD_ARG_LEN);
+    } 
+
+    //Local Open File Name 
+    FILE *writefd = fopen(strrchr(temp, '/')+1, "w+");
+    if(writefd == NULL) {
+        fprintf(stderr, "Open Local File Error!\n");
+        return -1;
+    }
+
+    //Lock Mutex & Action 
+    //finish transfer unlock
+    pthread_mutex_lock(&sft_lock);
+
+    util->sft->action->send(util->sft, (void *)util->pdu, util->pdu->pdulen);
+
+    while(1) {
+        util->sft->action->recv(util->sft, (void *)util->pdu, util->pdu->pdulen);
+        if(util->pdu->cmd != CMD_GET)
+            break;
+
+        if(fputs((char *)util->pdu->arg, writefd) == EOF)
+            perror("fputs");
+    }
+
+    pthread_mutex_unlock(&sft_lock);
+
+    //Finish ! if Error print else writen curraddr
+    if(util->pdu->cmd == CMD_ERROR)
+        printf("get : %s\n", (char *)util->pdu->arg);
+    else {
+        *(strrchr(temp, '/')) = '\0';
+        strncpy(curr_addr, temp, MAX_PATH_LEN);
+    }
+
+    fclose(writefd);
+
 
     return 0;
 }
@@ -300,16 +424,15 @@ int util_ls(struct __UTILITY_DATA *util)
         return -1;
     }
 
-    if(strncmp((char*)util->pdu->arg, "/", 1) == 0)
-        strncpy(curr_addr, (char *)util->pdu->arg, MAX_PATH_LEN);
-    else {
-        char temp[MAX_PATH_LEN];
+    char temp[MAX_PATH_LEN];
 
+    if(strncmp((char*)util->pdu->arg, "/", 1) == 0)
+        strncpy(temp, (char *)util->pdu->arg, MAX_PATH_LEN);
+    else {
         if(strncmp((char *)util->pdu->arg, "./", 2) == 0)
             snprintf(temp, MAX_PATH_LEN, "%s/%s", curr_addr, (char *)util->pdu->arg+2);
         else
             snprintf(temp, MAX_PATH_LEN, "%s/%s", curr_addr, (char *)util->pdu->arg);
-        strncpy(curr_addr, temp, MAX_PATH_LEN);
         strncpy((char *)util->pdu->arg, temp, MAX_CMD_ARG_LEN);
     }
 
@@ -325,6 +448,9 @@ int util_ls(struct __UTILITY_DATA *util)
     }while(util->pdu->cmd == CMD_LS);
 
     pthread_mutex_unlock(&sft_lock);
+
+    if(util->pdu->cmd != CMD_ERROR)
+        strncpy(curr_addr, temp, MAX_PATH_LEN);
 
     return 0;
 }

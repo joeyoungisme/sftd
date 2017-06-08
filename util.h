@@ -10,8 +10,8 @@
 #define MAX_PATH_LEN            256
 
 typedef enum {
-    THREAD_ALIVE,
-    THREAD_DEAD
+    THREAD_DEAD = 0,
+    THREAD_ALIVE
 }THREAD_FLAG;
 
 struct __RECV_THREAD {

@@ -18,22 +18,22 @@ client: $(OBJECTS)
 
 obj: $(OBJECTS) sft.o
 
-sft.o: sft.c
+sft.o: sft.c sft.h
 	$(CC) $(CFLAGS) -c sft.c
 
-sftc.o: sftc.c
+sftc.o: sftc.c sftc.h
 	$(CC) $(CFLAGS) -c sftc.c
 
-sftd.o: sfts.c
+sftd.o: sfts.c sfts.h
 	$(CC) $(CFLAGS) -c sfts.c
 
-err.o: err.c
+err.o: err.c err.h
 	$(CC) $(CFLAGS) -c err.c
 
-pdu.o: pdu.c
+pdu.o: pdu.c pdu.h
 	$(CC) $(CFLAGS) -c pdu.c
 
-util.o: util.c
+util.o: util.c util.h
 	$(CC) $(CFLAGS) -c util.c
 
 tester: tester.c $(OBJECTS)

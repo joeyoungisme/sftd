@@ -1,7 +1,6 @@
 #ifndef PDU_H
 #define PDU_H
 
-//#include "cmd.h"
 #include "util.h"
 
 #define MAX_CMD_LEN         256
@@ -17,6 +16,7 @@ typedef enum {
     CMD_QUIT,
     CMD_INFO,
     CMD_HELP,
+    CMD_ERROR,
 
     CMD_UNKNOWN
 }COMMAND;
@@ -34,6 +34,8 @@ int pdu_info(SFT_PDU *pdu);
 int pdu_init(SFT_PDU *pdu);
 
 int pdu_setcommand(SFT_PDU *pdu);
+
+void pdu_error(SFT_PDU *pdu, const char *message);
 
 void pdu_free(SFT_PDU *pdu);
 

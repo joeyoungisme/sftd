@@ -156,6 +156,13 @@ int pdu_setcommand(SFT_PDU *pdu)
     return 0;
 }
 
+void pdu_error(SFT_PDU *pdu, const char *message)
+{
+    pdu_init(pdu);
+    pdu->cmd = CMD_ERROR;
+    snprintf(pdu->arg, MAX_CMD_ARG_LEN, message);
+}
+
 
 void pdu_free(SFT_PDU *pdu)
 {
