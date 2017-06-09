@@ -21,7 +21,7 @@ int str_cmp(const void *arg1, const void *arg2)
         else
             return -1;
     }
-    else 
+    else
         if(strchr(s2, '/'))
             return 1;
 
@@ -152,16 +152,16 @@ void *thread_ls(void *arg)
 
     heapify((void*)copy_list, count, NAME_MAX, str_cmp, str_swap);
 
-    heapsorting((void*)copy_list, count, NAME_MAX, str_cmp, str_swap);   
+    heapsorting((void*)copy_list, count, NAME_MAX, str_cmp, str_swap);
 
     for(int index = 0; index < count; ++index) {
         strncpy((char *)util->pdu->arg, copy_list[index], MAX_CMD_ARG_LEN);
         util->sft->action->send(util->sft, (void *)util->pdu, util->pdu->pdulen);
     }
-    
+
     pdu_init(util->pdu);
     util->sft->action->send(util->sft, (void *)util->pdu, util->pdu->pdulen);
-    
+
     return NULL;
 }
 
@@ -177,7 +177,7 @@ void *thread_get(void *arg)
         return NULL;
     }
 
-    while(fgets((char *)util->pdu->arg, MAX_CMD_ARG_LEN, readfd) != NULL) 
+    while(fgets((char *)util->pdu->arg, MAX_CMD_ARG_LEN, readfd) != NULL)
         util->sft->action->send(util->sft, (void *)util->pdu, util->pdu->pdulen);
 
     pdu_init(util->pdu);
@@ -199,7 +199,7 @@ void *thread_put(void *arg)
         util->sft->action->send(util->sft, (void *)util->pdu, util->pdu->pdulen);
         return NULL;
     }
-    
+
     while(1) {
         util->sft->action->recv(util->sft, (void *)util->pdu, util->pdu->pdulen);
         if(util->pdu->cmd != CMD_PUT)
@@ -209,7 +209,7 @@ void *thread_put(void *arg)
     }
 
     fclose(writefd);
-    
+
     return NULL;
 }
 
@@ -335,7 +335,7 @@ int util_put(struct __UTILITY_DATA *util)
 
     //Lock -> send command & transfer file -> Unlock
     pthread_mutex_lock(&sft_lock);
-    
+
     util->sft->action->send(util->sft, (void *)util->pdu, sizeof(SFT_PDU));
     while(fgets((char *)util->pdu->arg, MAX_CMD_ARG_LEN, readfd))
         util->sft->action->send(util->sft, (void *)util->pdu, sizeof(SFT_PDU));
@@ -376,16 +376,16 @@ int util_get(struct __UTILITY_DATA *util)
         else
             snprintf(temp, MAX_PATH_LEN, "%s/%s", curr_addr, (char *)util->pdu->arg);
         strncpy((char *)util->pdu->arg, temp, MAX_CMD_ARG_LEN);
-    } 
+    }
 
-    //Local Open File Name 
+    //Local Open File Name
     FILE *writefd = fopen(strrchr(temp, '/')+1, "w+");
     if(writefd == NULL) {
         fprintf(stderr, "Open Local File Error!\n");
         return -1;
     }
 
-    //Lock Mutex & Action 
+    //Lock Mutex & Action
     //finish transfer unlock
     pthread_mutex_lock(&sft_lock);
 
@@ -418,7 +418,7 @@ int util_get(struct __UTILITY_DATA *util)
 
 int util_ls(struct __UTILITY_DATA *util)
 {
-   
+
     if(!util->sft) {
         printf("Ls Error : Please Listen / Connection First\n");
         return -1;
@@ -629,6 +629,5 @@ void util_destroy(struct __UTILITY_DATA *util)
         util->action->quit(util);
 
     free(util);
-
 }
 

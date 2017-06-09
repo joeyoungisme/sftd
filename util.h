@@ -9,6 +9,14 @@
 #define MAX_CMD_ARG_LEN         256
 #define MAX_PATH_LEN            256
 
+typedef struct __UTILITY_DATA {
+    struct __SFT_PDU *pdu;
+    struct __SFT_DATA *sft;
+
+    struct __RECV_THREAD *recv;
+    struct __UTILITY_ACTION *action;
+}UTILITY;
+
 typedef enum {
     THREAD_DEAD = 0,
     THREAD_ALIVE
@@ -24,14 +32,6 @@ struct __RECV_THREAD {
     void *(*put)(void *arg);
     void *(*close)(void *arg);
 };
-
-typedef struct __UTILITY_DATA {
-    struct __SFT_PDU *pdu;
-
-    struct __RECV_THREAD *recv;
-    struct __UTILITY_ACTION *action;
-    struct __SFT_DATA *sft;
-}UTILITY;
 
 struct __UTILITY_ACTION {
     int (*init)(struct __UTILITY_DATA *util);
@@ -61,8 +61,6 @@ int util_quit(struct __UTILITY_DATA *util);
 int util_ls(struct __UTILITY_DATA *util);
 int util_info(struct __UTILITY_DATA *util);
 int util_help(void);
-
-void *util_receiver(void *arg);
 
 struct __UTILITY_DATA *util_create(void);
 
