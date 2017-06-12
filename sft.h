@@ -33,6 +33,6 @@ typedef struct __SFT_ACTION {
 }SFT_ACTION;
 
 struct __SFT_DATA *sft_create(SFT_TYPE type);
-void sft_destroy(SFT_DATA *sft);
+void sft_destroy(SFT_DATA **sft);
 
 #endif

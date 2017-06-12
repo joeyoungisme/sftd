@@ -4,6 +4,36 @@
 
 #include "pdu.h"
 
+static char remote_addr[MAX_PATH_LEN] = "./";
+static char local_addr[MAX_PATH_LEN] = "./";
+
+static char remote_temp[MAX_PATH_LEN] = "./";
+static char local_temp[MAX_PATH_LEN] = "./";
+
+static char remotefile[MAX_PATH_LEN] = "";
+static char localfile[MAX_PATH_LEN] = "";
+
+static void setaddr(char *base, char *addr)
+{
+    char temp[MAX_PATH_LEN];
+
+    if(strncmp(addr, "/", 1) == 0)
+        strncpy(base, addr, MAX_PATH_LEN);
+    else {
+        if(strncmp(addr, "./", 2) == 0)
+            snprintf(temp, MAX_PATH_LEN, "%s/%s", base, addr+2);
+        else
+            snprintf(temp, MAX_PATH_LEN, "%s/%s", base, addr);
+
+        strncpy(base, temp, MAX_PATH_LEN);
+    }
+}
+
+static void setfilename(char *base, char *name)
+{
+    strncpy(base, name, MAX_PATH_LEN);
+}
+
 SFT_PDU *pdu_new(void)
 {
     SFT_PDU *p = (SFT_PDU *)malloc(sizeof(SFT_PDU));
@@ -58,8 +88,6 @@ int pdu_info(SFT_PDU *pdu)
     return 0;
 }
 
-
-
 int pdu_init(SFT_PDU *pdu)
 {
     pdu->cmd = CMD_UNKNOWN;
@@ -69,66 +97,103 @@ int pdu_init(SFT_PDU *pdu)
     return 0;
 }
 
-int pdu_setcommand(SFT_PDU *pdu)
+char *pdu_remoteaddr(void)
 {
-    printf("Command >> ");
+    return remote_temp;
+}
 
-    char command[MAX_CMD_LEN];
+char *pdu_localaddr(void)
+{
+    return local_temp;
+}
 
-    if(!fgets(command, MAX_CMD_LEN, stdin)) {
-        fprintf(stderr, "fgets command failed!\n");
-        return -1;
-    }
+char *pdu_remotefile(void)
+{
+    return remotefile;
+}
 
-    if(!strchr(command, '\n'))
-        while(fgetc(stdin) != '\n');
+char *pdu_localfile(void)
+{
+    return localfile;
+}
 
-    if(strncmp(command, "ls", 2) == 0)
+void pdu_saveaddr(void)
+{
+    strncpy(remote_addr, remote_temp, MAX_PATH_LEN);
+    strncpy(local_addr, local_temp, MAX_PATH_LEN);
+}
+
+void pdu_recoveryaddr(void)
+{
+    strncpy(remote_temp, remote_addr, MAX_PATH_LEN);
+    strncpy(local_temp, local_addr, MAX_PATH_LEN);
+}
+
+int pdu_setargument(SFT_PDU *pdu, char *arg)
+{
+    if(arg)
+        if(!strncpy(pdu->arg, arg, MAX_CMD_ARG_LEN))
+            return -1;
+    return 0;
+}
+
+int pdu_setcommand(SFT_PDU *pdu, char *userinput)
+{
+    pdu_init(pdu);
+
+    if(strncmp(userinput, "ls", 2) == 0)
         pdu->cmd = CMD_LS;
-    else if(strncmp(command, "get", 3) == 0)
+    else if(strncmp(userinput, "get", 3) == 0)
         pdu->cmd = CMD_GET;
-    else if(strncmp(command, "put", 3) == 0)
+    else if(strncmp(userinput, "put", 3) == 0)
         pdu->cmd = CMD_PUT;
-    else if(strncmp(command, "connection", 10) == 0)
+    else if(strncmp(userinput, "connection", 10) == 0)
         pdu->cmd = CMD_CONNECTION;
-    else if(strncmp(command, "listen", 6) == 0)
+    else if(strncmp(userinput, "listen", 6) == 0)
         pdu->cmd = CMD_LISTEN;
-    else if(strncmp(command, "close", 5) == 0)
+    else if(strncmp(userinput, "close", 5) == 0)
         pdu->cmd = CMD_CLOSE;
-    else if(strncmp(command, "quit", 4) == 0)
+    else if(strncmp(userinput, "quit", 4) == 0)
         pdu->cmd = CMD_QUIT;
-    else if(strncmp(command, "help", 4) == 0)
+    else if(strncmp(userinput, "help", 4) == 0)
         pdu->cmd = CMD_HELP;
-    else if(strncmp(command, "info", 4) == 0)
+    else if(strncmp(userinput, "info", 4) == 0)
         pdu->cmd = CMD_INFO;
     else
         pdu->cmd = CMD_UNKNOWN;
 
+    char command[MAX_CMD_LEN];
+    char local[MAX_CMD_LEN];
+    char remote[MAX_CMD_LEN];
     int count = 0;
-    char cmd[MAX_CMD_LEN];
 
     switch(pdu->cmd) {
     case CMD_LS:
-        count = sscanf(command, "%s %s", cmd, pdu->arg);
-
+        count = sscanf(userinput, "%s %s", command, remote);
         if(count == 1)
-            snprintf(pdu->arg, MAX_CMD_ARG_LEN, "%s", "./");
+            return 0;
         else if(count != 2) {
             fprintf(stderr, "Command Error : Argument Error!\n");
             return -1;
         }
-
+        setaddr(remote_temp, remote);
         return 0;
     case CMD_GET:
     case CMD_PUT:
-        count = sscanf(command, "%s %s", cmd, pdu->arg);
-        if(count != 2) {
+        count = sscanf(userinput, "%s %s %s", command, local, remote);
+        if(count != 3) {
             fprintf(stderr, "Command Error : Argument Error!\n");
             return -1;
         }
+        setfilename(localfile, local);
+        setfilename(remotefile, remote);
+        *strrchr(local, '/') = '\0';
+        *strrchr(remote, '/') = '\0';
+        setaddr(local_temp, local);
+        setaddr(remote_temp, remote);
         return 0;
     case CMD_CONNECTION:
-        count = sscanf(command, "%s %s", cmd, pdu->arg);
+        count = sscanf(userinput, "%s %s", command, pdu->arg);
         if(count == 1)
             snprintf(pdu->arg, MAX_CMD_ARG_LEN, "%s", "127.0.0.1");
         else if(count != 2) {
@@ -162,7 +227,6 @@ void pdu_error(SFT_PDU *pdu, const char *message)
     pdu->cmd = CMD_ERROR;
     snprintf(pdu->arg, MAX_CMD_ARG_LEN, message);
 }
-
 
 void pdu_free(SFT_PDU *pdu)
 {

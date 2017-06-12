@@ -5,6 +5,7 @@
 
 #define MAX_CMD_LEN         256
 #define MAX_CMD_ARG_LEN     256
+#define MAX_INPUT_LEN       (MAX_CMD_ARG_LEN*3)
 
 typedef enum {
     CMD_LISTEN = 0,
@@ -28,15 +29,17 @@ typedef struct __SFT_PDU {
 }SFT_PDU;
 
 SFT_PDU *pdu_new(void);
-
+char *pdu_remoteaddr(void);
+char *pdu_localaddr(void);
+char *pdu_remotefile(void);
+char *pdu_localfile(void);
+void pdu_saveaddr(void);
+void pdu_recoveryaddr(void);
 int pdu_info(SFT_PDU *pdu);
-
 int pdu_init(SFT_PDU *pdu);
-
-int pdu_setcommand(SFT_PDU *pdu);
-
+int pdu_setargument(SFT_PDU *pdu, char *arg);
+int pdu_setcommand(SFT_PDU *pdu, char *cmd);
 void pdu_error(SFT_PDU *pdu, const char *message);
-
 void pdu_free(SFT_PDU *pdu);
 
 

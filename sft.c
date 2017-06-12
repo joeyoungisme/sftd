@@ -34,10 +34,12 @@ struct __SFT_DATA *sft_create(SFT_TYPE type)
     return sft;
 }
 
-void sft_destroy(SFT_DATA *sft)
+void sft_destroy(SFT_DATA **sft)
 {
-    if(sft) {
-        sft->action->close(sft);
-        free(sft);
+    if(*sft) {
+        (*sft)->action->close(*sft);
+        free(*sft);
+        *sft = NULL;
     }
+
 }

@@ -8,7 +8,6 @@
 #include "util.h"
 #include "heapsort.h"
 
-static char curr_addr[MAX_PATH_LEN] = "./";
 pthread_mutex_t sft_lock;
 
 int str_cmp(const void *arg1, const void *arg2)
@@ -117,7 +116,7 @@ void *thread_recv(void *arg)
     pthread_exit(NULL);
 }
 
-void *thread_ls(void *arg)
+void *__attribute__((optimize("O0"))) thread_ls(void *arg)
 {
     struct __UTILITY_DATA *util = (struct __UTILITY_DATA *)arg;
 
@@ -134,25 +133,21 @@ void *thread_ls(void *arg)
     }
 
     char copy_list[count][NAME_MAX];
-    memset(copy_list, 0, count * NAME_MAX);
 
     for(int index = 0; index < count; ++index) {
         strncpy(copy_list[index], ls_dir[index]->d_name, NAME_MAX);
-        if(ls_dir[index]->d_type == DT_DIR) {
-            printf("DIR : %s", ls_dir[index]->d_name);
+        if(ls_dir[index]->d_type == DT_DIR)
             strncpy(strchr(copy_list[index], '\0'), "/\0", NAME_MAX);
-            printf(", %s\n", copy_list[index]);
-        }
         free(ls_dir[index]);
     }
     free(ls_dir);
 
-    for(int index = 0; index < count; ++index)
-        printf("copy list [%d] = %s\n", index, copy_list[index]);
-
-    heapify((void*)copy_list, count, NAME_MAX, str_cmp, str_swap);
-
-    heapsorting((void*)copy_list, count, NAME_MAX, str_cmp, str_swap);
+    int res = heapsorting((void *)copy_list, count, NAME_MAX, str_cmp, str_swap);
+    if(res) {
+        pdu_error(util->pdu, "Heapsorting Error");
+        util->sft->action->send(util->sft, (void *)util->pdu, util->pdu->pdulen);
+        return NULL;
+    }
 
     for(int index = 0; index < count; ++index) {
         strncpy((char *)util->pdu->arg, copy_list[index], MAX_CMD_ARG_LEN);
@@ -216,14 +211,10 @@ void *thread_put(void *arg)
 void *thread_close(void *arg)
 {
     struct __UTILITY_DATA *util = (struct __UTILITY_DATA *)arg;
-    printf("\n ------------------------------ \n");
-    printf("REceiver : Recv Command \"close\" \n");
-    printf("\n ------------------------------ \n");
 
     util->sft->action->send(util->sft, (void *)util->pdu, sizeof(SFT_PDU));
 
-    sft_destroy(util->sft);
-    util->sft = NULL;
+    sft_destroy(&util->sft);
 
     util->recv->flag = THREAD_DEAD;
 
@@ -233,6 +224,7 @@ void *thread_close(void *arg)
 int util_connection(struct __UTILITY_DATA *util)
 {
     if(util->sft) {
+        fprintf(stderr, "sft exist");
         return -1;
     }
 
@@ -244,19 +236,19 @@ int util_connection(struct __UTILITY_DATA *util)
     int res = 0;
     res = util->sft->action->init(util->sft);
     if(res) {
-        sft_destroy(util->sft);
+        sft_destroy(&util->sft);
         return res;
     }
 
     res = util->sft->action->connect(util->sft, util->pdu->arg, SFT_PORT);
     if(res) {
-        sft_destroy(util->sft);
+        sft_destroy(&util->sft);
         return res;
     }
 
     res = pthread_create(&util->recv->thd, NULL, util->recv->run, (void *)util);
     if(res != 0) {
-        sft_destroy(util->sft);
+        sft_destroy(&util->sft);
         return res;
     }
 
@@ -278,21 +270,21 @@ int util_listen(struct __UTILITY_DATA *util)
     int res = util->sft->action->init(util->sft);
     if(res) {
         fprintf(stderr, "sft init failure\n");
-        sft_destroy(util->sft);
+        sft_destroy(&util->sft);
         return res;
     }
 
     res = util->sft->action->connect(util->sft, NULL, SFT_PORT);
     if(res) {
         fprintf(stderr, "sft connection failure\n");
-        sft_destroy(util->sft);
+        sft_destroy(&util->sft);
         return res;
     }
 
     res = pthread_create(&util->recv->thd, NULL, util->recv->run, (void *)util);
     if(res != 0) {
         perror("pthread create");
-        sft_destroy(util->sft);
+        sft_destroy(&util->sft);
         return res;
     }
 
@@ -322,16 +314,13 @@ int util_put(struct __UTILITY_DATA *util)
     }
 
     //open file
-    FILE *readfd = fopen((char *)util->pdu->arg, "r");
+    FILE *readfd = fopen(pdu_localfile(), "r");
     if(readfd == NULL) {
         perror("fopen");
         return -1;
     }
 
-    //Generator remote addr
-    char temp[MAX_PATH_LEN];
-    snprintf(temp, MAX_PATH_LEN, "%s/%s", curr_addr, (char *)util->pdu->arg);
-    strncpy((char *)util->pdu->arg, temp, MAX_CMD_ARG_LEN);
+    pdu_setargument(util->pdu, pdu_remotefile());
 
     //Lock -> send command & transfer file -> Unlock
     pthread_mutex_lock(&sft_lock);
@@ -349,11 +338,12 @@ int util_put(struct __UTILITY_DATA *util)
     fclose(readfd);
 
     //Finish ! if Error print else writen curraddr
-    if(util->pdu->cmd == CMD_ERROR)
+    if(util->pdu->cmd == CMD_ERROR) {
+        pdu_recoveryaddr();
         printf("put : %s\n", (char *)util->pdu->arg);
+    }
     else {
-        *(strrchr(temp, '/')) = '\0';
-        strncpy(curr_addr, temp, MAX_PATH_LEN);
+        pdu_saveaddr();
     }
 
     return 0;
@@ -366,20 +356,10 @@ int util_get(struct __UTILITY_DATA *util)
         return -1;
     }
 
-    //Check user enter address
-    char temp[MAX_PATH_LEN];
-    if(strncmp((char*)util->pdu->arg, "/", 1) == 0)
-        strncpy(temp, (char *)util->pdu->arg, MAX_PATH_LEN);
-    else {
-        if(strncmp((char *)util->pdu->arg, "./", 2) == 0)
-            snprintf(temp, MAX_PATH_LEN, "%s/%s", curr_addr, (char *)util->pdu->arg+2);
-        else
-            snprintf(temp, MAX_PATH_LEN, "%s/%s", curr_addr, (char *)util->pdu->arg);
-        strncpy((char *)util->pdu->arg, temp, MAX_CMD_ARG_LEN);
-    }
+    pdu_setargument(util->pdu, pdu_remotefile());
 
     //Local Open File Name
-    FILE *writefd = fopen(strrchr(temp, '/')+1, "w+");
+    FILE *writefd = fopen(pdu_localfile(), "w+");
     if(writefd == NULL) {
         fprintf(stderr, "Open Local File Error!\n");
         return -1;
@@ -403,15 +383,15 @@ int util_get(struct __UTILITY_DATA *util)
     pthread_mutex_unlock(&sft_lock);
 
     //Finish ! if Error print else writen curraddr
-    if(util->pdu->cmd == CMD_ERROR)
+    if(util->pdu->cmd == CMD_ERROR) {
+        pdu_recoveryaddr();
         printf("get : %s\n", (char *)util->pdu->arg);
+    }
     else {
-        *(strrchr(temp, '/')) = '\0';
-        strncpy(curr_addr, temp, MAX_PATH_LEN);
+        pdu_saveaddr();
     }
 
     fclose(writefd);
-
 
     return 0;
 }
@@ -424,17 +404,8 @@ int util_ls(struct __UTILITY_DATA *util)
         return -1;
     }
 
-    char temp[MAX_PATH_LEN];
-
-    if(strncmp((char*)util->pdu->arg, "/", 1) == 0)
-        strncpy(temp, (char *)util->pdu->arg, MAX_PATH_LEN);
-    else {
-        if(strncmp((char *)util->pdu->arg, "./", 2) == 0)
-            snprintf(temp, MAX_PATH_LEN, "%s/%s", curr_addr, (char *)util->pdu->arg+2);
-        else
-            snprintf(temp, MAX_PATH_LEN, "%s/%s", curr_addr, (char *)util->pdu->arg);
-        strncpy((char *)util->pdu->arg, temp, MAX_CMD_ARG_LEN);
-    }
+    pdu_setargument(util->pdu, pdu_remoteaddr());
+    printf("Remote addr : %s\n", pdu_remoteaddr());
 
     pthread_mutex_lock(&sft_lock);
 
@@ -449,8 +420,13 @@ int util_ls(struct __UTILITY_DATA *util)
 
     pthread_mutex_unlock(&sft_lock);
 
-    if(util->pdu->cmd != CMD_ERROR)
-        strncpy(curr_addr, temp, MAX_PATH_LEN);
+    if(util->pdu->cmd == CMD_ERROR) {
+        printf("Error : Remote addr = %s, ", pdu_remoteaddr());
+        pdu_recoveryaddr();
+        printf("%s\n", pdu_remoteaddr());
+    }
+    else
+        pdu_saveaddr();
 
     return 0;
 }
@@ -495,15 +471,15 @@ int util_help(void)
 {
     char help_message[] =
         "Following Command, Please Listen/Connection First\n"
-        "listen             : Socket bind & accept\n"
-        "connection [IP]    : Socket connect\n"
-        "ls [Path]          : Move to destination and show all file or directory \n"
-        "get [Path]         : Get remote side file\n"
-        "put [Path]         : Put file to remote side\n"
-        "close              : Close Coneection, Used listen / connection after close\n"
-        "quit               : Quit this Program\n"
-        "help               : Show command list\n"
-        "info               : Show Something Information\n";
+        "listen                             : Socket bind & accept\n"
+        "connection [IP]                    : Socket connect\n"
+        "ls [Path]                          : Move to destination and show all file or directory \n"
+        "get [Local Path] [Remote Path]     : Get remote side file\n"
+        "put [Local Path] [Remote Path]     : Put file to remote side\n"
+        "close                              : Close Coneection, Used listen / connection after close\n"
+        "quit                               : Quit this Program\n"
+        "help                               : Show command list\n"
+        "info                               : Show Something Information\n";
 
     printf("\n%s\n", help_message);
 
@@ -577,12 +553,18 @@ int util_run(struct __UTILITY_DATA *util)
 
     while(q_flag)
     {
-        //set pdu init
-        pdu_init(util->pdu);
-
         //set pdu cmd
-        if(pdu_setcommand(util->pdu))
-            continue;
+        char userinput[MAX_INPUT_LEN];
+
+        printf("Command >> ");
+        if(!fgets(userinput, MAX_INPUT_LEN, stdin)) {
+            perror("fgets command");
+            return -1;
+        }
+        if(!strchr(userinput, '\n'))
+            while(fgetc(stdin) != '\n');
+
+        pdu_setcommand(util->pdu, userinput);
 
         //execute / send cmd
         switch(util->pdu->cmd) {

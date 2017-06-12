@@ -122,7 +122,9 @@ int sft_client_info(SFT_DATA *sft)
 
 int sft_client_close(SFT_DATA *sft)
 {
-    close(sft->sockfd);
+    if(sft || sft->sockfd > 0) {
+        close(sft->sockfd);
+    }
 
     return 0;
 }
